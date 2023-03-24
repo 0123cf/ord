@@ -112,11 +112,12 @@ pub struct TransactionBuilder {
 type Result<T> = std::result::Result<T, Error>;
 
 impl TransactionBuilder {
+  const BASE_POSTAGE: usize = 1_000;
   const ADDITIONAL_INPUT_VBYTES: usize = 58;
   const ADDITIONAL_OUTPUT_VBYTES: usize = 43;
-  const MAX_POSTAGE: Amount = Amount::from_sat(2 * 10_000);
+  const MAX_POSTAGE: Amount = Amount::from_sat(2 * BASE_POSTAGE);
   const SCHNORR_SIGNATURE_SIZE: usize = 64;
-  pub(crate) const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
+  pub(crate) const TARGET_POSTAGE: Amount = Amount::from_sat(BASE_POSTAGE);
 
   pub fn build_transaction_with_postage(
     outgoing: SatPoint,
