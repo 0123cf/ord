@@ -107,6 +107,7 @@ pub struct TransactionBuilder {
   unused_change_addresses: Vec<Address>,
   utxos: BTreeSet<OutPoint>,
   target: Target,
+  postage: usize,
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -114,9 +115,17 @@ type Result<T> = std::result::Result<T, Error>;
 impl TransactionBuilder {
   const ADDITIONAL_INPUT_VBYTES: usize = 58;
   const ADDITIONAL_OUTPUT_VBYTES: usize = 43;
-  const MAX_POSTAGE: Amount = Amount::from_sat(2 * 1000);
+  // const MAX_POSTAGE: Amount = Amount::from_sat(2 * 10_000);
   const SCHNORR_SIGNATURE_SIZE: usize = 64;
-  pub(crate) const TARGET_POSTAGE: Amount = Amount::from_sat(1000);
+  // pub(crate) const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
+
+  pub fn max_postage(&self) -> Amount {
+    Amount::from_sat((2 * self.postage) as u64)
+  }
+
+  pub fn target_postage(&self) -> Amount {
+    Amount::from_sat((self.postage) as u64)
+  }
 
   pub fn build_transaction_with_postage(
     outgoing: SatPoint,
@@ -125,6 +134,7 @@ impl TransactionBuilder {
     recipient: Address,
     change: [Address; 2],
     fee_rate: FeeRate,
+    postage: usize,
   ) -> Result<Transaction> {
     Self::new(
       outgoing,
@@ -134,6 +144,7 @@ impl TransactionBuilder {
       change,
       fee_rate,
       Target::Postage,
+      postage,
     )?
     .build_transaction()
   }
@@ -146,6 +157,7 @@ impl TransactionBuilder {
     change: [Address; 2],
     fee_rate: FeeRate,
     output_value: Amount,
+    postage: usize,
   ) -> Result<Transaction> {
     let dust_value = recipient.script_pubkey().dust_value();
 
@@ -164,6 +176,7 @@ impl TransactionBuilder {
       change,
       fee_rate,
       Target::Value(output_value),
+      postage,
     )?
     .build_transaction()
   }
@@ -187,6 +200,7 @@ impl TransactionBuilder {
     change: [Address; 2],
     fee_rate: FeeRate,
     target: Target,
+    postage: usize,
   ) -> Result<Self> {
     if change.contains(&recipient) {
       return Err(Error::DuplicateAddress(recipient));
@@ -208,6 +222,7 @@ impl TransactionBuilder {
       recipient,
       unused_change_addresses: change.to_vec(),
       target,
+      postage,
     })
   }
 
@@ -342,7 +357,7 @@ impl TransactionBuilder {
 
     if let Some(excess) = value.checked_sub(self.fee_rate.fee(self.estimate_vbytes())) {
       let (max, target) = match self.target {
-        Target::Postage => (Self::MAX_POSTAGE, Self::TARGET_POSTAGE),
+        Target::Postage => (self.max_postage(), self.target_postage()),
         Target::Value(value) => (value, value),
       };
 
@@ -555,7 +570,7 @@ impl TransactionBuilder {
         match self.target {
           Target::Postage => {
             assert!(
-              Amount::from_sat(output.value) <= Self::MAX_POSTAGE + slop,
+              Amount::from_sat(output.value) <= self.max_postage() + slop,
               "invariant: excess postage is stripped"
             );
           }

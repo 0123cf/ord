@@ -54,6 +54,8 @@ pub(crate) struct Inscribe {
   pub(crate) dry_run: bool,
   #[clap(long, help = "Send inscription to <DESTINATION>.")]
   pub(crate) destination: Option<Address>,
+  #[clap(long, help = "transaction postage amount", default_value_t = 1000)]
+  pub(crate) postage: usize,
 }
 
 impl Inscribe {
@@ -88,6 +90,7 @@ impl Inscribe {
         self.commit_fee_rate.unwrap_or(self.fee_rate),
         self.fee_rate,
         self.no_limit,
+        self.postage,
       )?;
 
     utxos.insert(
@@ -155,6 +158,7 @@ impl Inscribe {
     commit_fee_rate: FeeRate,
     reveal_fee_rate: FeeRate,
     no_limit: bool,
+    postage: usize,
   ) -> Result<(Transaction, Transaction, TweakedKeyPair)> {
     let satpoint = if let Some(satpoint) = satpoint {
       satpoint
@@ -220,6 +224,10 @@ impl Inscribe {
       &reveal_script,
     );
 
+    fn target_postage(postage: usize) -> Amount {
+      Amount::from_sat(postage as u64)
+    }
+
     let unsigned_commit_tx = TransactionBuilder::build_transaction_with_value(
       satpoint,
       inscriptions,
@@ -227,7 +235,8 @@ impl Inscribe {
       commit_tx_address.clone(),
       change,
       commit_fee_rate,
-      reveal_fee + TransactionBuilder::TARGET_POSTAGE,
+      reveal_fee + target_postage(postage),
+      postage,
     )?;
 
     let (vout, output) = unsigned_commit_tx
